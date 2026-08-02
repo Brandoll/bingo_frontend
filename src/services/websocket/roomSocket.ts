@@ -1,9 +1,7 @@
 import { Client } from '@stomp/stompjs'
 import type { RealtimeEvent, RoomSnapshot } from '../../types/room'
 import type { GameSnapshot } from '../../types/game'
-
-const defaultWsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-const WS_URL = import.meta.env.VITE_WS_URL || `${defaultWsProtocol}://${window.location.host}/ws`
+import { WS_URL } from '../../config/runtime'
 
 export function subscribeToRoom(roomId: string, onSnapshot: (room: RoomSnapshot) => void) {
   const client = new Client({
