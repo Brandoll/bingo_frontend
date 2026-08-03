@@ -8,6 +8,7 @@ import { gameApi } from '../api/gameApi'
 import { PlayerPreferencesPanel } from './PlayerPreferencesPanel'
 import { usePlayerPreferences } from '../hooks/usePlayerPreferences'
 import { speakBallNumber } from '../../../services/audio/ballVoice'
+import { playBingoCageSound } from '../../../services/audio/bingoCageSound'
 
 const prizeLabel: Record<PrizeType, string> = { LINE: 'Línea', DOUBLE_LINE: 'Doble línea', BINGO: '¡Bingo!' }
 
@@ -31,8 +32,12 @@ export function AdminCardPanel({ room, session, game }: {
   })
 
   useEffect(() => {
-    if (preferences.announceBalls && game.currentNumber) speakBallNumber(game.currentNumber, preferences.voiceRate)
-  }, [game.currentNumber, preferences.announceBalls, preferences.voiceRate])
+    if (!game.currentNumber) return
+    if (preferences.cageSound) playBingoCageSound()
+    if (!preferences.announceBalls) return
+    const timeout = window.setTimeout(() => speakBallNumber(game.currentNumber!, preferences.voiceRate), preferences.cageSound ? 620 : 0)
+    return () => window.clearTimeout(timeout)
+  }, [game.currentNumber, preferences.announceBalls, preferences.cageSound, preferences.voiceRate])
 
   return (
     <section className={`panel admin-card-panel ${preferences.highContrast ? 'high-contrast' : ''}`}>

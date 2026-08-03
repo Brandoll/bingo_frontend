@@ -14,6 +14,7 @@ import { useGame } from '../../game/hooks/useGame'
 import { gameApi } from '../../game/api/gameApi'
 import { roomsApi } from '../../rooms/api/roomsApi'
 import { useRoom } from '../../rooms/hooks/useRoom'
+import { playBingoCageSound } from '../../../services/audio/bingoCageSound'
 
 type QuickAction = 'draw' | 'pause' | 'resume' | 'repeat' | 'finish' | 'new-round'
 
@@ -65,7 +66,7 @@ export function HostPlayPage() {
     if (room.data.status === 'WAITING') start.mutate()
     else if (currentGame?.status === 'PAUSED') action.mutate('resume')
     else if (currentGame?.status === 'ROUND_FINISHED') action.mutate('new-round')
-    else action.mutate('draw')
+    else { playBingoCageSound(); action.mutate('draw') }
   }
   const primaryLabel = room.data.status === 'WAITING' ? 'Iniciar'
     : currentGame?.status === 'PAUSED' ? 'Continuar'

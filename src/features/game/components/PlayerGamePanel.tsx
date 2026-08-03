@@ -12,6 +12,7 @@ import { PlayerPreferencesPanel } from './PlayerPreferencesPanel'
 import { usePlayerPreferences } from '../hooks/usePlayerPreferences'
 import { speakBallNumber } from '../../../services/audio/ballVoice'
 import { WinnerAnnouncement } from './WinnerAnnouncement'
+import { playBingoCageSound } from '../../../services/audio/bingoCageSound'
 
 interface PlayerGamePanelProps {
   room: RoomSnapshot
@@ -37,8 +38,12 @@ export function PlayerGamePanel({ room, session }: PlayerGamePanelProps) {
     mutationFn: ({ cardId, type }: { cardId: string; type: PrizeType }) => gameApi.claim(room.code, session.token, cardId, type),
   })
   useEffect(() => {
-    if (preferences.announceBalls && game.data?.currentNumber) speakBallNumber(game.data.currentNumber, preferences.voiceRate)
-  }, [game.data?.currentNumber, preferences.announceBalls, preferences.voiceRate])
+    if (!game.data?.currentNumber) return
+    if (preferences.cageSound) playBingoCageSound()
+    if (!preferences.announceBalls) return
+    const timeout = window.setTimeout(() => speakBallNumber(game.data!.currentNumber!, preferences.voiceRate), preferences.cageSound ? 620 : 0)
+    return () => window.clearTimeout(timeout)
+  }, [game.data?.currentNumber, preferences.announceBalls, preferences.cageSound, preferences.voiceRate])
 
   if (game.isLoading || cards.isLoading) return <section className="panel player-game-loading"><span className="loader" /><p>Preparando tu cartón…</p></section>
   if (game.isError || !game.data) return <section className="panel player-game-loading"><strong>No pudimos recuperar la ronda.</strong><button className="button button-secondary" onClick={() => void game.refetch()}>Reintentar</button></section>

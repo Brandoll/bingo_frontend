@@ -9,6 +9,7 @@ import { useRoom } from '../../rooms/hooks/useRoom'
 import { useGame } from '../../game/hooks/useGame'
 import { speakBallNumber } from '../../../services/audio/ballVoice'
 import { WinnerAnnouncement } from '../../game/components/WinnerAnnouncement'
+import { playBingoCageSound, prepareBingoCageSound } from '../../../services/audio/bingoCageSound'
 
 const board = Array.from({ length: 90 }, (_, index) => index + 1)
 const publicName = (name: string, hidden: boolean) => {
@@ -23,8 +24,10 @@ export function DisplayPage() {
   const game = useGame(code, room.data?.id, room.data?.status === 'RUNNING')
   const [soundEnabled, setSoundEnabled] = useState(false)
   useEffect(() => {
-    if (!soundEnabled || !game.data?.currentNumber || !('speechSynthesis' in window)) return
-    speakBallNumber(game.data.currentNumber, 0.9)
+    if (!soundEnabled || !game.data?.currentNumber) return
+    playBingoCageSound()
+    const timeout = window.setTimeout(() => speakBallNumber(game.data!.currentNumber!, 0.9), 620)
+    return () => window.clearTimeout(timeout)
   }, [game.data?.currentNumber, soundEnabled])
   if (room.isLoading) return <LoadingView />
   if (room.isError || !room.data) return <ErrorView message="No encontramos esta sala." retry={() => void room.refetch()} />
@@ -36,7 +39,7 @@ export function DisplayPage() {
 
   return (
     <main className={`display-page ${game.data?.status.toLowerCase() ?? 'waiting'}`}>
-      <header className="display-header"><Logo /><div><span className="live-dot" /> {gameLabel}</div><div className="display-tools"><button onClick={() => setSoundEnabled(enabled => !enabled)}>{soundEnabled ? <Volume2 /> : <VolumeX />}{soundEnabled ? ' Voz activa' : ' Activar voz'}</button><button onClick={() => void document.documentElement.requestFullscreen()}><Expand /> Pantalla completa</button></div></header>
+      <header className="display-header"><Logo /><div><span className="live-dot" /> {gameLabel}</div><div className="display-tools"><button onClick={() => { if (!soundEnabled) void prepareBingoCageSound(); setSoundEnabled(enabled => !enabled) }}>{soundEnabled ? <Volume2 /> : <VolumeX />}{soundEnabled ? ' Sonido activo' : ' Activar sonido'}</button><button onClick={() => void document.documentElement.requestFullscreen()}><Expand /> Pantalla completa</button></div></header>
       <div className="display-layout">
         {isWaiting ? <section className="display-welcome">
           <span className="eyebrow"><Radio size={15} /> Próxima partida</span>

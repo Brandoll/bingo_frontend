@@ -18,6 +18,7 @@ import type { RoomMember } from '../../../types/room'
 import { AdminCardPanel } from '../../game/components/AdminCardPanel'
 import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog'
 import { speakBallNumber } from '../../../services/audio/ballVoice'
+import { playBingoCageSound } from '../../../services/audio/bingoCageSound'
 
 type HostAction = 'draw' | 'pause' | 'resume' | 'undo' | 'repeat' | 'finish' | 'new-round'
 
@@ -141,7 +142,7 @@ export function HostControlPage() {
     if (room.data.status === 'WAITING') start.mutate()
     else if (currentGame?.status === 'PAUSED') action.mutate('resume')
     else if (currentGame?.status === 'ROUND_FINISHED') action.mutate('new-round')
-    else action.mutate('draw')
+    else { playBingoCageSound(); action.mutate('draw') }
   }
   const primaryLabel = room.data.status === 'WAITING' ? 'Iniciar partida'
     : currentGame?.status === 'PAUSED' ? 'Continuar partida'

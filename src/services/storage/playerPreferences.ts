@@ -1,6 +1,7 @@
 export interface PlayerPreferences {
   autoMark: boolean
   announceBalls: boolean
+  cageSound: boolean
   highContrast: boolean
   voiceRate: number
 }
@@ -8,6 +9,7 @@ export interface PlayerPreferences {
 const defaults: PlayerPreferences = {
   autoMark: false,
   announceBalls: false,
+  cageSound: false,
   highContrast: false,
   voiceRate: 0.92,
 }
