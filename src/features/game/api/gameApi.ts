@@ -1,5 +1,5 @@
 import { apiRequest } from '../../../services/api/http'
-import type { GameCard, GameSnapshot, PhysicalCard, PrizeClaim, PrizeType, RoomStatistics } from '../../../types/game'
+import type { GameCard, GameSettings, GameSnapshot, PhysicalCard, PrizeClaim, PrizeType, RoomStatistics } from '../../../types/game'
 
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` })
 
@@ -16,7 +16,7 @@ export const gameApi = {
   automatic: (code: string, token: string, enabled: boolean, intervalSeconds: number) => apiRequest<GameSnapshot>(`/rooms/${code}/game/automatic-draw`, {
     method: 'PUT', headers: auth(token), body: JSON.stringify({ enabled, intervalSeconds }),
   }),
-  settings: (code: string, token: string, settings: Pick<GameSnapshot, 'lineEnabled' | 'doubleLineEnabled' | 'bingoEnabled' | 'rankingPublic'>) => apiRequest<GameSnapshot>(`/rooms/${code}/game/settings`, {
+  settings: (code: string, token: string, settings: GameSettings) => apiRequest<GameSnapshot>(`/rooms/${code}/game/settings`, {
     method: 'PATCH', headers: auth(token), body: JSON.stringify(settings),
   }),
   myCards: (code: string, token: string) => apiRequest<GameCard[]>(`/rooms/${code}/game/cards/me`, { headers: auth(token) }),

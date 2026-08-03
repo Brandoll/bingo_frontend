@@ -11,6 +11,7 @@ import { DrawHistory } from './DrawHistory'
 import { PlayerPreferencesPanel } from './PlayerPreferencesPanel'
 import { usePlayerPreferences } from '../hooks/usePlayerPreferences'
 import { speakBallNumber } from '../../../services/audio/ballVoice'
+import { WinnerAnnouncement } from './WinnerAnnouncement'
 
 interface PlayerGamePanelProps {
   room: RoomSnapshot
@@ -79,6 +80,7 @@ export function PlayerGamePanel({ room, session }: PlayerGamePanelProps) {
 
       {(mark.isError || claim.isError) && <div className="floating-error" role="alert">{(mark.error ?? claim.error) instanceof ApiError ? (mark.error ?? claim.error as ApiError).message : 'No pudimos completar la acción.'}</div>}
       {claim.isSuccess && <div className="claim-success" role="status"><Trophy /> Solicitud enviada. El host la revisará.</div>}
+      <WinnerAnnouncement game={game.data} hideParticipantNames={room.hideParticipantNames} />
     </div>
   )
 }

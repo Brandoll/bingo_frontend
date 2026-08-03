@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, ExternalLink, Gauge, LoaderCircle, Lock, LockOpen, Pause, Play, Radio, Redo2, RotateCcw, Settings2, SkipForward, Square, TicketCheck, Trophy, Tv2, Users, Volume2, X } from 'lucide-react'
+import { Check, ExternalLink, Gauge, LoaderCircle, Lock, LockOpen, Pause, Play, Radio, Redo2, RotateCcw, Settings2, SkipForward, Smartphone, Square, TicketCheck, Trophy, Tv2, Users, Volume2, X } from 'lucide-react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { PageShell } from '../../../components/layout/PageShell'
 import { LoadingView } from '../../../components/feedback/LoadingView'
@@ -13,7 +13,7 @@ import { ApiError } from '../../../services/api/http'
 import { gameApi } from '../../game/api/gameApi'
 import { useGame } from '../../game/hooks/useGame'
 import { DrawHistory } from '../../game/components/DrawHistory'
-import type { GameSnapshot } from '../../../types/game'
+import type { GameSettings, GameSnapshot, PrizeType } from '../../../types/game'
 import type { RoomMember } from '../../../types/room'
 import { AdminCardPanel } from '../../game/components/AdminCardPanel'
 import { ConfirmDialog } from '../../../components/feedback/ConfirmDialog'
@@ -44,6 +44,7 @@ export function HostControlPage() {
   const [confirmAction, setConfirmAction] = useState<'finish' | 'close' | null>(null)
   const [closedByHost, setClosedByHost] = useState(false)
   const statistics = useQuery({ queryKey: ['statistics', code, currentGameRound(game.data)], queryFn: () => gameApi.statistics(code, session?.token ?? ''), enabled: Boolean(game.data && canControl) })
+  const hostCards = useQuery({ queryKey: ['host-cards', code, currentGameRound(game.data)], queryFn: () => gameApi.allCards(code, session?.token ?? ''), enabled: Boolean(game.data && canControl) })
 
   const updateGame = (snapshot: GameSnapshot) => {
     queryClient.setQueryData(['game', code], snapshot)
@@ -76,7 +77,7 @@ export function HostControlPage() {
     onSuccess: updateGame,
   })
   const settings = useMutation({
-    mutationFn: (next: Pick<GameSnapshot, 'lineEnabled' | 'doubleLineEnabled' | 'bingoEnabled' | 'rankingPublic'>) => gameApi.settings(code, session!.token, next),
+    mutationFn: (next: GameSettings) => gameApi.settings(code, session!.token, next),
     onSuccess: updateGame,
   })
   const physical = useMutation({
@@ -87,6 +88,17 @@ export function HostControlPage() {
   const registerPhysical = useMutation({
     mutationFn: () => gameApi.registerPhysical(newPhysicalId, newPhysicalNumbers.split(/[\s,;]+/).filter(Boolean).map(Number), session!.token),
     onSuccess: card => { setPhysicalId(card.externalId); setNewPhysicalId(''); setNewPhysicalNumbers(''); physicalLookup.reset() },
+  })
+  const physicalPrize = useMutation({
+    mutationFn: async ({ cardId, type }: { cardId: string; type: PrizeType }) => {
+      const claim = await gameApi.claim(code, session!.token, cardId, type)
+      return gameApi.reviewClaim(code, session!.token, claim.id, true)
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['game', code] }),
+  })
+  const deactivatePhysical = useMutation({
+    mutationFn: (cardId: string) => gameApi.deactivatePhysical(code, session!.token, cardId),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['host-cards', code] }),
   })
   const review = useMutation({
     mutationFn: ({ id, approved }: { id: string; approved: boolean }) => gameApi.reviewClaim(code, session!.token, id, approved),
@@ -124,7 +136,7 @@ export function HostControlPage() {
   const currentGame = game.data
   const pendingClaims = currentGame?.claims.filter(claim => claim.status === 'PENDING') ?? []
   const busy = start.isPending || action.isPending || automatic.isPending
-  const error = start.error ?? action.error ?? automatic.error ?? settings.error ?? physical.error ?? physicalLookup.error ?? registerPhysical.error ?? review.error ?? roomAction.error ?? roomSettings.error
+  const error = start.error ?? action.error ?? automatic.error ?? settings.error ?? physical.error ?? physicalLookup.error ?? registerPhysical.error ?? physicalPrize.error ?? deactivatePhysical.error ?? review.error ?? roomAction.error ?? roomSettings.error
   const runPrimaryAction = () => {
     if (room.data.status === 'WAITING') start.mutate()
     else if (currentGame?.status === 'PAUSED') action.mutate('resume')
@@ -134,6 +146,19 @@ export function HostControlPage() {
   const primaryLabel = room.data.status === 'WAITING' ? 'Iniciar partida'
     : currentGame?.status === 'PAUSED' ? 'Continuar partida'
       : currentGame?.status === 'ROUND_FINISHED' ? 'Nueva ronda' : 'Extraer siguiente bola'
+  const updateGameSetting = (key: keyof GameSettings) => {
+    if (!currentGame) return
+    settings.mutate({
+      lineEnabled: currentGame.lineEnabled,
+      doubleLineEnabled: currentGame.doubleLineEnabled,
+      bingoEnabled: currentGame.bingoEnabled,
+      rankingPublic: currentGame.rankingPublic,
+      automaticBingoDetectionEnabled: currentGame.automaticBingoDetectionEnabled,
+      stopOnBingoEnabled: currentGame.stopOnBingoEnabled,
+      winnerAnnouncementEnabled: currentGame.winnerAnnouncementEnabled,
+      [key]: !currentGame[key],
+    })
+  }
 
   return (
     <PageShell action={<Link className="header-action" to={`/room/${code}/display`} target="_blank"><Tv2 /> Vista TV <ExternalLink size={14} /></Link>}>
@@ -173,20 +198,42 @@ export function HostControlPage() {
             <label className="setting-field"><span>Cartones digitales por jugador</span><select value={room.data.cardsPerPlayer} disabled={room.data.status !== 'WAITING' || roomSettings.isPending} onChange={event => roomSettings.mutate({ cardsPerPlayer: Number(event.target.value), allowLateJoin: room.data.allowLateJoin, hideParticipantNames: room.data.hideParticipantNames })}>{[1, 2, 3, 4].map(value => <option value={value} key={value}>{value}</option>)}</select></label>
             <label className="setting-toggle"><span>Permitir entradas durante la partida</span><input type="checkbox" checked={room.data.allowLateJoin} disabled={roomSettings.isPending} onChange={() => roomSettings.mutate({ cardsPerPlayer: room.data.cardsPerPlayer, allowLateJoin: !room.data.allowLateJoin, hideParticipantNames: room.data.hideParticipantNames })} /></label>
             <label className="setting-toggle"><span>Ocultar nombres completos en TV</span><input type="checkbox" checked={room.data.hideParticipantNames} disabled={roomSettings.isPending} onChange={() => roomSettings.mutate({ cardsPerPlayer: room.data.cardsPerPlayer, allowLateJoin: room.data.allowLateJoin, hideParticipantNames: !room.data.hideParticipantNames })} /></label>
+            <Link className="host-play-entry" to={`/room/${code}/host/play`}><Smartphone /><span><strong>Jugar como host</strong><small>Tu cartón con una barra móvil de controles esenciales.</small></span><SkipForward /></Link>
             <button className="close-room-button" onClick={() => setConfirmAction('close')} disabled={roomAction.isPending}>Cerrar sala permanentemente</button>
           </section>}
 
           {currentGame && <section className="panel settings-panel">
             <div className="section-title"><div><span><Settings2 /> Configuración</span><h2>Premios y pantalla</h2></div></div>
             {([
-              ['lineEnabled', 'Primera línea'], ['doubleLineEnabled', 'Doble línea'], ['bingoEnabled', 'Bingo completo'], ['rankingPublic', 'Ranking público'],
-            ] as const).map(([key, label]) => <label className="setting-toggle" key={key}><span>{label}</span><input type="checkbox" checked={currentGame[key]} disabled={settings.isPending} onChange={() => settings.mutate({ lineEnabled: currentGame.lineEnabled, doubleLineEnabled: currentGame.doubleLineEnabled, bingoEnabled: currentGame.bingoEnabled, rankingPublic: currentGame.rankingPublic, [key]: !currentGame[key] })} /></label>)}
+              ['lineEnabled', 'Primera línea', 'Permite solicitar premio por una línea completa.'],
+              ['doubleLineEnabled', 'Doble línea', 'Permite solicitar premio por dos líneas completas.'],
+              ['bingoEnabled', 'Bingo completo', 'Habilita el premio principal de la ronda.'],
+              ['rankingPublic', 'Ranking público', 'Muestra en TV quién está más cerca.'],
+              ['automaticBingoDetectionEnabled', 'Detectar bingo digital', 'Aprueba automáticamente cartones digitales completos.'],
+              ['stopOnBingoEnabled', 'Detener al ganar', 'Finaliza la ronda cuando se aprueba un bingo.'],
+              ['winnerAnnouncementEnabled', 'Anunciar ganador', 'Muestra el nombre y cartón ganador en las pantallas.'],
+            ] as const).map(([key, label, description]) => <label className="setting-toggle setting-toggle-detailed" key={key}><span><strong>{label}</strong><small>{description}</small></span><input type="checkbox" checked={Boolean(currentGame[key])} disabled={settings.isPending} onChange={() => updateGameSetting(key)} /></label>)}
           </section>}
 
           {currentGame && <section className="panel physical-panel">
             <div className="section-title"><div><span><TicketCheck /> Cartilla física</span><h2>Activar en esta ronda</h2></div></div>
             <form onSubmit={event => { event.preventDefault(); physical.mutate() }}><label>ID de cartilla<input value={physicalId} onChange={event => { setPhysicalId(event.target.value.toUpperCase()); physicalLookup.reset() }} placeholder="Ej. 001" required /></label><label>Nombre del jugador<input value={physicalName} onChange={event => setPhysicalName(event.target.value)} placeholder="Nombre" minLength={2} required /></label><div className="physical-actions"><button type="button" className="button button-ghost" disabled={!physicalId || physicalLookup.isPending} onClick={() => physicalLookup.mutate()}>Buscar</button><button className="button button-secondary" disabled={physical.isPending}>{physical.isPending ? <LoaderCircle className="spin" /> : <TicketCheck />} Activar</button></div></form>
             {physicalLookup.data && <div className="physical-preview"><strong>{physicalLookup.data.externalId}</strong><span>{physicalLookup.data.numbers.join(' · ')}</span></div>}
+            <div className="active-physical-cards">
+              {hostCards.data?.filter(card => card.cardType === 'PHYSICAL').map(card => {
+                const drawn = new Set(currentGame.drawnNumbers)
+                const values = card.grid.flat().filter((number): number is number => number !== null)
+                const matched = values.filter(number => drawn.has(number)).length
+                const rows = card.grid.filter(row => row.filter((number): number is number => number !== null).every(number => drawn.has(number))).length
+                const prizes: Array<{ type: PrizeType; label: string; enabled: boolean }> = [
+                  { type: 'LINE', label: 'Línea', enabled: currentGame.lineEnabled && rows >= 1 },
+                  { type: 'DOUBLE_LINE', label: 'Doble', enabled: currentGame.doubleLineEnabled && rows >= 2 },
+                  { type: 'BINGO', label: 'Bingo', enabled: currentGame.bingoEnabled && matched === 15 },
+                ]
+                return <article key={card.id}><div><strong>{card.displayName}</strong><span>{card.externalCode} · {matched}/15 aciertos</span></div><div>{prizes.map(prize => <button key={prize.type} disabled={!prize.enabled || physicalPrize.isPending || currentGame.status === 'ROUND_FINISHED'} onClick={() => physicalPrize.mutate({ cardId: card.id, type: prize.type })}>{prize.label}</button>)}</div><button className="deactivate-card" aria-label={`Desactivar ${card.externalCode}`} onClick={() => deactivatePhysical.mutate(card.id)} disabled={deactivatePhysical.isPending}><X /></button></article>
+              })}
+              {hostCards.data && !hostCards.data.some(card => card.cardType === 'PHYSICAL') && <p className="empty-copy">No hay cartillas físicas activas en esta ronda.</p>}
+            </div>
             {isPrimaryHost && <details className="physical-register"><summary>Registrar una cartilla nueva</summary><form onSubmit={event => { event.preventDefault(); registerPhysical.mutate() }}><label>Nuevo ID<input value={newPhysicalId} onChange={event => setNewPhysicalId(event.target.value.toUpperCase())} placeholder="Ej. CLUB-073" required /></label><label>15 números separados por comas<textarea value={newPhysicalNumbers} onChange={event => setNewPhysicalNumbers(event.target.value)} placeholder="1, 10, 20, 31, 42…" required /></label><button className="button button-secondary" disabled={registerPhysical.isPending}>{registerPhysical.isPending ? <LoaderCircle className="spin" /> : <TicketCheck />} Registrar</button></form></details>}
           </section>}
 

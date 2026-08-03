@@ -39,12 +39,25 @@ export interface GameSnapshot {
   doubleLineEnabled: boolean
   bingoEnabled: boolean
   rankingPublic: boolean
+  automaticBingoDetectionEnabled: boolean
+  stopOnBingoEnabled: boolean
+  winnerAnnouncementEnabled: boolean
   startedAt: string
   pausedAt?: string
   endedAt?: string
   ranking: RankingEntry[]
   claims: PrizeClaim[]
 }
+
+export type GameSettings = Pick<GameSnapshot,
+  | 'lineEnabled'
+  | 'doubleLineEnabled'
+  | 'bingoEnabled'
+  | 'rankingPublic'
+  | 'automaticBingoDetectionEnabled'
+  | 'stopOnBingoEnabled'
+  | 'winnerAnnouncementEnabled'
+>
 
 export interface GameCard {
   id: string

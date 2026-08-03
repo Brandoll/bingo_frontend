@@ -8,6 +8,7 @@ import { Logo } from '../../../components/ui/Logo'
 import { useRoom } from '../../rooms/hooks/useRoom'
 import { useGame } from '../../game/hooks/useGame'
 import { speakBallNumber } from '../../../services/audio/ballVoice'
+import { WinnerAnnouncement } from '../../game/components/WinnerAnnouncement'
 
 const board = Array.from({ length: 90 }, (_, index) => index + 1)
 const publicName = (name: string, hidden: boolean) => {
@@ -31,7 +32,6 @@ export function DisplayPage() {
   const isWaiting = room.data.status === 'WAITING'
   const isClosed = room.data.status === 'CLOSED' || game.data?.status === 'CLOSED'
   const drawn = new Set(game.data?.drawnNumbers ?? [])
-  const approvedPrize = game.data?.claims.find(claim => claim.status === 'APPROVED')
   const gameLabel = isClosed ? 'Sala finalizada' : game.data?.status === 'PAUSED' ? 'Partida pausada' : game.data?.status === 'ROUND_FINISHED' ? 'Ronda finalizada' : 'Sala en vivo'
 
   return (
@@ -55,7 +55,7 @@ export function DisplayPage() {
 
         <section className="board-panel"><div className="board-title"><div><span>Tablero oficial</span><strong>90 bolas</strong></div><span>{isWaiting ? 'Esperando inicio' : gameLabel}</span></div><div className="number-board">{board.map(number => <span className={`${drawn.has(number) ? 'drawn' : ''} ${game.data?.currentNumber === number ? 'current' : ''}`} key={number}>{number}</span>)}</div><footer><span>{isWaiting ? 'Los números aparecerán aquí durante la partida' : `${game.data?.drawnNumbers.length ?? 0} bolas extraídas`}</span><span className="board-legend"><i /> Extraído</span></footer></section>
       </div>
-      {approvedPrize && <div className="winner-overlay"><div><Award /><span>{approvedPrize.prizeType === 'BINGO' ? '¡BINGO!' : approvedPrize.prizeType.replace('_', ' ')}</span><strong>{publicName(approvedPrize.displayName, room.data.hideParticipantNames)}</strong><small>{approvedPrize.cardCode}</small></div></div>}
+      <WinnerAnnouncement game={game.data} hideParticipantNames={room.data.hideParticipantNames} />
     </main>
   )
 }
